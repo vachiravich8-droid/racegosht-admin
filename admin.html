@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>RACE GOSHT – แผงควบคุมเซิร์ฟเวอร์</title>
+<style>
+:root{--bg:#f6f7fb;--card:#fff;--text:#14161f;--muted:#5b6070;--accent:#e8341c;--line:#e3e5ee;--ok:#188038;--err:#d93025;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1017;--card:#181b26;--text:#f2f3f8;--muted:#a1a6b8;--line:#2a2e3d;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;line-height:1.5;padding:env(safe-area-inset-top,0) 0 env(safe-area-inset-bottom,0)}
+.wrap{max-width:720px;margin:0 auto;padding:20px}
+h1{margin:0 0 4px;font-size:1.5rem}.sub{color:var(--muted);margin:0 0 16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px}
+.card h2{margin:0 0 8px;font-size:1.1rem}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+input,textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font:inherit}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:10px 18px;cursor:pointer;background:var(--accent);color:#fff;margin-top:12px}
+button.sec{background:transparent;color:var(--text);border:1px solid var(--line)}
+button.danger{background:#7a1010}
+button:disabled{opacity:.5;cursor:wait}
+#log{font-family:ui-monospace,Menlo,monospace;font-size:.85rem;max-height:220px;overflow-y:auto}
+#log div{padding:4px 0;border-bottom:1px solid var(--line)}
+.ok{color:var(--ok)}.err{color:var(--err)}
+.hide{display:none}
+.note{font-size:.85rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏁 RACE GOSHT · แผงควบคุมเซิร์ฟเวอร์</h1>
+  <p class="sub">คำสั่งจะส่งถึง<strong>ทุกเซิร์ฟเวอร์</strong>ที่เปิดอยู่พร้อมกัน</p>
+
+  <!-- เชื่อมต่อ -->
+  <div class="card" id="login">
+    <h2>🔐 เชื่อมต่อ</h2>
+    <label>URL ของ Cloudflare Worker</label>
+    <input id="url" placeholder="https://admin-api.ชื่อคุณ.workers.dev" inputmode="url">
+    <label>รหัสแอดมิน (ADMIN_TOKEN)</label>
+    <input id="token" type="password" autocomplete="current-password">
+    <button id="connect">เข้าสู่ระบบ</button>
+    <p class="note">ข้อมูลเก็บไว้ในแท็บนี้เท่านั้น ปิดแท็บแล้วหาย</p>
+  </div>
+
+  <div id="panel" class="hide">
+    <div class="card">
+      <h2>📢 ประกาศถึงผู้เล่นทุกคน</h2>
+      <label>ข้อความ (ไม่เกิน 200 ตัวอักษร)</label>
+      <textarea id="aText" maxlength="200" rows="2"></textarea>
+      <button id="aGo">ส่งประกาศ</button>
+    </div>
+
+    <div class="card">
+      <h2>👢 เตะผู้เล่น</h2>
+      <label>ชื่อผู้ใช้ Roblox (Username)</label>
+      <input id="kName" autocapitalize="none" autocomplete="off">
+      <label>เหตุผล</label>
+      <input id="kReason" maxlength="100" placeholder="เช่น ใช้โปรแกรมช่วยเล่น">
+      <button id="kGo" class="danger">เตะ</button>
+    </div>
+
+    <div class="card">
+      <h2>🛑 ปิดเซิร์ฟเวอร์ทั้งหมด</h2>
+      <p class="note">เตะผู้เล่นทุกคนออกจากทุกเซิร์ฟเวอร์ ใช้ตอนอัปเดตเกม</p>
+      <button id="sGo" class="danger">ปิดทุกเซิร์ฟเวอร์</button>
+    </div>
+
+    <div class="card">
+      <h2>📜 บันทึกคำสั่ง</h2>
+      <div id="log"><div class="note">ยังไม่มีคำสั่ง</div></div>
+      <button id="out" class="sec">ออกจากระบบ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $=function(i){return document.getElementById(i)};
+  var cfg={url:'',token:''};
+  try{cfg.url=sessionStorage.getItem('wurl')||'';cfg.token=sessionStorage.getItem('wtok')||''}catch(e){}
+  $('url').value=cfg.url;
+
+  function show(){var on=!!(cfg.url&&cfg.token);$('login').classList.toggle('hide',on);$('panel').classList.toggle('hide',!on)}
+  show();
+
+  $('connect').onclick=function(){
+    var u=$('url').value.trim().replace(/\/+$/,''),t=$('token').value;
+    if(!/^https:\/\//.test(u)||!t){alert('กรอก URL (https://) และรหัสให้ครบ');return}
+    cfg={url:u,token:t};
+    try{sessionStorage.setItem('wurl',u);sessionStorage.setItem('wtok',t)}catch(e){}
+    $('token').value='';show();
+  };
+  $('out').onclick=function(){
+    cfg={url:'',token:''};
+    try{sessionStorage.removeItem('wurl');sessionStorage.removeItem('wtok')}catch(e){}
+    show();
+  };
+
+  function log(ok,text){
+    var l=$('log'),d=document.createElement('div');
+    if(l.firstChild&&l.firstChild.className==='note')l.innerHTML='';
+    d.className=ok?'ok':'err';
+    d.textContent=new Date().toLocaleTimeString('th-TH')+'  '+(ok?'✓ ':'✗ ')+text;
+    l.insertBefore(d,l.firstChild);
+  }
+
+  async function send(btn,payload,label){
+    btn.disabled=true;
+    try{
+      var r=await fetch(cfg.url,{method:'POST',
+        headers:{'Authorization':'Bearer '+cfg.token,'Content-Type':'application/json'},
+        body:JSON.stringify(payload)});
+      var t=await r.text();
+      if(r.status===401){log(false,'รหัสแอดมินไม่ถูกต้อง');}
+      else if(r.ok){log(true,label);}
+      else{log(false,label+' ล้มเหลว ('+r.status+') '+t.slice(0,120));}
+    }catch(e){log(false,'เชื่อมต่อ Worker ไม่ได้ ตรวจสอบ URL');}
+    btn.disabled=false;
+  }
+
+  $('aGo').onclick=function(){
+    var t=$('aText').value.trim();if(!t)return;
+    send(this,{action:'announce',text:t},'ประกาศ: '+t);$('aText').value='';
+  };
+  $('kGo').onclick=function(){
+    var n=$('kName').value.trim(),r=$('kReason').value.trim()||'ถูกแอดมินเตะ';
+    if(!n)return;
+    if(!confirm('เตะ '+n+' ?'))return;
+    send(this,{action:'kick',target:n,reason:r},'เตะ '+n+' ('+r+')');
+  };
+  $('sGo').onclick=function(){
+    if(prompt('พิมพ์ SHUTDOWN เพื่อยืนยันปิดทุกเซิร์ฟเวอร์')!=='SHUTDOWN')return;
+    send(this,{action:'shutdown'},'ปิดเซิร์ฟเวอร์ทั้งหมด');
+  };
+})();
+</script>
+</body>
+</html>
